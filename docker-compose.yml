@@ -1,0 +1,44 @@
+# lokyy-runner — ein Forgejo-Actions-Runner, den ein Kursteilnehmer in Coolify
+# direkt aus diesem Repo deployt. Keine Terminal-Bastelei: Repo wählen, drei
+# Umgebungsvariablen setzen, deployen.
+#
+#   FORGEJO_URL    z. B. https://forgejo.deinedomain.de/   (mit Slash am Ende)
+#   RUNNER_UUID    aus Forgejo: Actions -> Runners -> "Neuen Runner erstellen"
+#   RUNNER_TOKEN   aus demselben Dialog
+#   RUNNER_LABELS  optional, Default: docker + ubuntu-latest
+services:
+  docker-in-docker:
+    image: docker:dind
+    privileged: true
+    environment:
+      DOCKER_TLS_CERTDIR: ""
+    command: ["dockerd", "--host=tcp://0.0.0.0:2375", "--tls=false"]
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep dockerd >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+
+  runner:
+    image: data.forgejo.org/forgejo/runner:12.10.2
+    depends_on:
+      docker-in-docker:
+        condition: service_started
+    environment:
+      DOCKER_HOST: tcp://docker-in-docker:2375
+      FORGEJO_URL: ${FORGEJO_URL}
+      RUNNER_UUID: ${RUNNER_UUID}
+      RUNNER_TOKEN: ${RUNNER_TOKEN}
+      RUNNER_LABELS: ${RUNNER_LABELS:-docker:docker://node:20-bookworm,ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-22.04}
+    entrypoint: ["/bin/sh", "/entrypoint.sh"]
+    volumes:
+      - ./entrypoint.sh:/entrypoint.sh:ro
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD-SHELL", "pgrep -f forgejo-runner >/dev/null 2>&1 || exit 1"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 20s
