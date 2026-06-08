@@ -1,6 +1,6 @@
-# lokyy-runner — ein Forgejo-Actions-Runner, den ein Kursteilnehmer in Coolify
-# direkt aus diesem Repo deployt. Keine Terminal-Bastelei: Repo wählen, drei
-# Umgebungsvariablen setzen, deployen.
+# lokyy-runner — Forgejo-Actions-Runner, deploybar aus diesem Git-Repo (Coolify).
+# Repo wählen, drei Env-Variablen setzen, deployen. Das entrypoint-Skript ist ins
+# Image gebacken (Dockerfile), darum keine Mount-Fallen.
 #
 #   FORGEJO_URL    z. B. https://forgejo.deinedomain.de/   (mit Slash am Ende)
 #   RUNNER_UUID    aus Forgejo: Actions -> Runners -> "Neuen Runner erstellen"
@@ -22,7 +22,9 @@ services:
       start_period: 30s
 
   runner:
-    image: data.forgejo.org/forgejo/runner:12.10.2
+    build:
+      context: .
+      dockerfile: Dockerfile
     depends_on:
       docker-in-docker:
         condition: service_started
@@ -32,9 +34,6 @@ services:
       RUNNER_UUID: ${RUNNER_UUID}
       RUNNER_TOKEN: ${RUNNER_TOKEN}
       RUNNER_LABELS: ${RUNNER_LABELS:-docker:docker://node:20-bookworm,ubuntu-latest:docker://ghcr.io/catthehacker/ubuntu:act-22.04}
-    entrypoint: ["/bin/sh", "/entrypoint.sh"]
-    volumes:
-      - ./entrypoint.sh:/entrypoint.sh:ro
     restart: unless-stopped
     healthcheck:
       test: ["CMD-SHELL", "pgrep -f forgejo-runner >/dev/null 2>&1 || exit 1"]
